@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sorting Visualizer - Bar Chart</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* Make body full screen and use a darker background */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* Darker background */
+            color: #ffffff; /* White text */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh; /* Full viewport height */
+            width: 100vw; /* Full viewport width */
+            margin: 0;
+            overflow: hidden; /* Prevent body scroll */
+            padding: 0; /* Remove default body padding */
+        }
+        #app-container {
+            display: flex; /* Changed to flex for horizontal layout */
+            width: 100vw; /* Full viewport width */
+            height: 100vh; /* Full viewport height */
+            background-color: #1f2937; /* Slightly lighter dark background for the container */
+            overflow: hidden;
+        }
+        #left-sidebar {
+            width: 250px; /* Fixed width for the sidebar */
+            flex-shrink: 0; /* Prevent shrinking */
+            background-color: #1f2937; /* Match app container background */
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border-right: 1px solid #374151; /* Subtle separator */
+            box-shadow: 5px 0 15px rgba(0, 0, 0, 0.3); /* Shadow for sidebar */
+            overflow-y: auto; /* Allow scrolling if many algorithms */
+        }
+        #main-content-wrapper {
+            flex-grow: 1; /* Allows main content to take remaining space */
+            display: flex;
+            flex-direction: column;
+            background-color: #1f2937; /* Match app container background */
+        }
+        #canvas-container {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+            background-color: #252f3e; /* Darker background for canvas area */
+            margin: 1rem; 
+        }
+        canvas {
+            background-color: #252f3e; /* Match canvas background to container */
+            display: block;
+            border-radius: 8px;
+            max-width: 100%;
+            max-height: 100%;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.3); /* Inner shadow for canvas */
+        }
+        .btn-base {
+            @apply px-5 py-2.5 rounded-lg font-bold transition-all duration-200 ease-in-out
+                     bg-gray-800 text-white border border-gray-700 shadow-lg;
+        }
+        .btn-base:hover:not(:disabled) {
+            @apply bg-gray-700 border-gray-500 shadow-xl scale-105;
+        }
+        .btn-base:disabled {
+            @apply opacity-40 cursor-not-allowed;
+        }
+        .info-label {
+            @apply text-base md:text-lg text-gray-300;
+        }
+
+        /* Specific styling for utility buttons (pause/reset/start) */
+        .utility-btn {
+            @apply btn-base px-5 py-2.5 text-xl;
+        }
+
+        /* New styling for algorithm buttons in sidebar */
+        .algo-sidebar-btn {
+            @apply w-full btn-base px-5 py-2.5 text-base bg-gray-700 border-gray-600 mb-2;
+        }
+        .algo-sidebar-btn:hover:not(:disabled) {
+            @apply bg-gray-500 border-gray-400 shadow-xl scale-105;
+        }
+        .algo-sidebar-btn.active { /* Style for the active/selected algorithm button */
+            @apply bg-blue-600 border-blue-500 shadow-xl;
+        }
+        .algo-sidebar-btn.active:hover {
+            @apply bg-blue-700 border-blue-600;
+        }
+
+        /* Specific styling for LLM button */
+        .llm-btn {
+            @apply btn-base px-6 py-2.5 text-base bg-purple-600 border-purple-500;
+        }
+        .llm-btn:hover:not(:disabled) {
+            @apply bg-purple-700 border-purple-600;
+        }
+        
+        /* New style for the "Start" button */
+        .nav-btn {
+            @apply btn-base px-5 py-2.5 text-xl bg-green-600 border-green-500;
+        }
+        .nav-btn:hover:not(:disabled) {
+            @apply bg-green-700 border-green-600;
+        }
+
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4a5568;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <!-- Left Sidebar -->
+        <div id="left-sidebar">
+            <h2 class="text-xl font-bold text-white mb-6">Sort Algorithms</h2>
+            <div id="sortAlgorithmButtons" class="flex flex-col items-center gap-2 w-full flex-grow">
+                <!-- Algorithm buttons will be dynamically added here by JavaScript -->
+            </div>
+            <!-- LLM button at the bottom of the sidebar -->
+            <div class="mt-auto pt-6 w-full"> 
+                <button id="explainAlgoButton" class="llm-btn w-full">✨ Explain Algorithm</button>
+            </div>
+        </div>
+
+        <!-- Main Content Wrapper -->
+        <div id="main-content-wrapper">
+            <!-- Top Info Panel -->
+            <div class="flex justify-between items-center p-4 bg-gray-900 rounded-tr-xl border-b border-gray-700 flex-wrap gap-y-3">
+                <!-- Left aligned info -->
+                <div class="flex flex-col md:flex-row md:space-x-6">
+                    <div id="statusLabel" class="info-label">Status: Idle</div>
+                    <div id="timeComplexityLabel" class="info-label">Time Complexity: N/A</div>
+                </div>
+
+                <!-- Right aligned controls and info -->
+                <div class="flex flex-col md:flex-row md:space-x-6 items-end md:items-center">
+                    <button id="speedButton" class="btn-base mb-2 md:mb-0">Fast</button>
+                    <div id="comparisonLabel" class="info-label">Comparisons: 0</div>
+                </div>
+            </div>
+
+            <!-- Canvas Container -->
+            <div id="canvas-container">
+                <canvas id="visualizerCanvas" class="rounded-lg"></canvas>
+            </div>
+
+            <!-- Bottom Utility Controls Panel -->
+            <div class="flex flex-col p-4 bg-gray-900 rounded-br-xl border-t border-gray-700">
+                <!-- Utility Buttons (Pause/Reset/Start) -->
+                <div class="flex justify-center gap-8">
+                    <button id="pauseButton" class="utility-btn flex items-center justify-center" disabled>
+                        <span id="pauseIcon">
+                            <!-- Pause Icon SVG -->
+                            <svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                            </svg>
+                        </span>
+                    </button>
+                    <button id="resetButton" class="utility-btn flex items-center justify-center">
+                        <!-- Reset Icon -->
+                        <span class="text-3xl">⟳</span>
+                    </button>
+                    <!-- New Start Button - replaces the old "Graph" button -->
+                    <button id="startButton" class="nav-btn flex items-center justify-center">
+                        <span class="text-2xl">▶</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Structure for LLM Explanation -->
+    <div id="explanationModal" class="fixed inset-0 bg-black bg-opacity-75 flex justify-center items-center z-50 hidden">
+        <div class="bg-gray-800 p-8 rounded-lg shadow-xl max-w-xl w-11/12 border border-gray-700 relative">
+            <h2 class="text-2xl font-bold mb-4 text-white">Algorithm Explanation</h2>
+            <div id="modalContent" class="text-gray-300 text-base leading-relaxed overflow-y-auto max-h-96">
+                Loading explanation...
+            </div>
+            <button id="closeModalButton" class="absolute top-4 right-4 text-gray-400 hover:text-white text-3xl">&times;</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('visualizerCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Element References
+        const statusLabel = document.getElementById('statusLabel');
+        const speedButton = document.getElementById('speedButton');
+        const timeComplexityLabel = document.getElementById('timeComplexityLabel');
+        const comparisonLabel = document.getElementById('comparisonLabel');
+        const pauseButton = document.getElementById('pauseButton');
+        const pauseIcon = document.getElementById('pauseIcon'); 
+        const resetButton = document.getElementById('resetButton');
+        const startButton = document.getElementById('startButton'); // New Start Button
+        const sortAlgorithmButtonsContainer = document.getElementById('sortAlgorithmButtons');
+        const explainAlgoButton = document.getElementById('explainAlgoButton');
+        const explanationModal = document.getElementById('explanationModal');
+        const modalContent = document.getElementById('modalContent');
+        const closeModalButton = document.getElementById('closeModalButton');
+
+
+        // Configuration
+        const ARRAY_SIZE = 50; // Increased array size for better bar visualization
+        const PADDING_X = 10;
+        const PADDING_Y = 20; // Padding at top and bottom for bars
+        const BAR_SPACING = 2; // Fixed spacing between bars
+        const MAX_VALUE = 99;
+        const MIN_VALUE = 10;
+
+        // State Variables
+        let array = [];
+        let isSorting = false;
+        let paused = false;
+        let stopRequested = false;
+        let fastMode = true; 
+        let currentStatus = "Idle";
+        let highlightA = -1, highlightB = -1;
+        let comparisons = 0;
+        let currentAlgorithmDisplayName = "N/A";
+        let selectedAlgorithm = null; // Stores the object of the currently selected algorithm
+
+        // SVG icons for play/pause
+        const playIconSVG = `<svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M8 5v14l11-7z"/></svg>`;
+        const pauseIconSVG = `<svg class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+
+
+        // --- Core Visualization Functions ---
+
+        /**
+         * Sets the canvas dimensions based on its parent container.
+         */
+        function setCanvasDimensions() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth - PADDING_X * 2;
+            canvas.height = container.clientHeight - PADDING_X * 2;
+        }
+
+        /**
+         * Draws the current state of the array as bars.
+         */
+        function drawArray() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#252f3e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const barCount = array.length;
+            const availableWidth = canvas.width - (PADDING_X * 2) - ((barCount - 1) * BAR_SPACING);
+            const barWidth = availableWidth / barCount;
+            const maxBarHeight = canvas.height - (PADDING_Y * 2);
+
+            // Determine the maximum value in the array's possible range (10-99)
+            // Using MAX_VALUE for scaling ensures bars don't exceed height even if 99 is absent.
+            const scalingFactor = maxBarHeight / MAX_VALUE; 
+
+            for (let i = 0; i < barCount; i++) {
+                const barValue = array[i];
+                const barHeight = barValue * scalingFactor;
+                
+                // Position calculations (Bars grow from the bottom)
+                const x = PADDING_X + i * (barWidth + BAR_SPACING);
+                const y = canvas.height - PADDING_Y - barHeight; 
+
+                let color = '#3b82f6'; /* Blue-500 */ 
+
+                // Highlight the current elements being processed
+                if (i === highlightA || i === highlightB) {
+                    color = '#ef4444'; /* Red-500 */ 
+                } 
+
+                // Draw the bar
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, barWidth, barHeight);
+
+                // Optionally draw value label on top of the bar for smaller array sizes
+                if (barWidth > 15) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = `${Math.min(10, barWidth * 0.2)}px Inter`;
+                    ctx.textAlign = 'center';
+                    ctx.fillText(String(barValue), x + barWidth / 2, y - 5);
+                }
+            }
+        }
+
+        /**
+         * Pauses execution for a short duration to visualize changes.
+         */
+        async function delay() {
+            return new Promise(resolve => {
+                const ms = fastMode ? 10 : 100; // Adjusted for better bar visualization
+                setTimeout(() => {
+                    function checkPaused() {
+                        if (paused) {
+                            setTimeout(checkPaused, 100); 
+                        } else {
+                            resolve(); 
+                        }
+                    }
+                    checkPaused();
+                }, ms);
+            });
+        }
+
+        /**
+         * Swaps two elements in the array and visualizes the swap.
+         */
+        async function swap(i, j) {
+            [array[i], array[j]] = [array[j], array[i]];
+            highlightA = i;
+            highlightB = j;
+            drawArray();
+            await delay();
+            updateComparisons(comparisons, false);
+        }
+
+        // --- UI Update Functions (Unchanged) ---
+
+        function updateStatus(status) {
+            currentStatus = status;
+            statusLabel.textContent = `Status: ${currentStatus}`;
+        }
+
+        function updateTimeComplexity(complexity) {
+            timeComplexityLabel.textContent = `Time Complexity: ${complexity}`;
+        }
+
+        function updateComparisons(count, isNonComparative) {
+            if (isNonComparative) {
+                comparisonLabel.textContent = `Comparisons: N/A (Non-comparative)`;
+            } else {
+                comparisonLabel.textContent = `Comparisons: ${count}`;
+            }
+        }
+
+        /** Disables all sorting algorithm buttons and enables utility buttons. */
+        function disableButtons() {
+            sortAlgorithmButtonsContainer.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            explainAlgoButton.disabled = true;
+            pauseButton.disabled = false;
+            resetButton.disabled = false;
+            speedButton.disabled = false;
+            startButton.disabled = true; // Disable start button during sort
+        }
+
+        /** Enables all sorting algorithm buttons and disables pause. */
+        function enableButtons() {
+            sortAlgorithmButtonsContainer.querySelectorAll('button').forEach(btn => btn.disabled = false);
+            explainAlgoButton.disabled = false;
+            pauseButton.disabled = true;
+            startButton.disabled = false; // Enable start button after reset
+        }
+
+        /** Sets the active state for the clicked algorithm button. */
+        function setActiveAlgoButton(clickedButton) {
+            sortAlgorithmButtonsContainer.querySelectorAll('button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            if (clickedButton) {
+                clickedButton.classList.add('active');
+            }
+        }
+
+        // --- Array Generation and Reset (Unchanged) ---
+
+        function generateRandomArray() {
+            array = [];
+            // Generate numbers between MIN_VALUE (10) and MAX_VALUE (99)
+            for (let i = 0; i < ARRAY_SIZE; i++) {
+                array.push(Math.floor(Math.random() * (MAX_VALUE - MIN_VALUE + 1)) + MIN_VALUE);
+            }
+            shuffleArray(array);
+        }
+
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+        }
+
+        function resetVisualizer() {
+            stopRequested = true;
+            paused = false;
+            isSorting = false;
+            highlightA = -1;
+            highlightB = -1;
+            comparisons = 0;
+            generateRandomArray();
+            updateStatus("Idle");
+            updateTimeComplexity("N/A");
+            updateComparisons(0, false);
+            drawArray();
+            pauseIcon.innerHTML = pauseIconSVG; 
+            enableButtons(); 
+            setActiveAlgoButton(selectedAlgorithm ? document.querySelector(`.algo-sidebar-btn[data-algo="${selectedAlgorithm.name}"]`) : null);
+            currentAlgorithmDisplayName = selectedAlgorithm ? selectedAlgorithm.display : "N/A";
+        }
+
+        // --- Sorting Algorithm Implementations (Logic is preserved) ---
+
+        async function startSorting(sortName, sortMethod) {
+            const clickedButton = document.querySelector(`.algo-sidebar-btn[data-algo="${selectedAlgorithm.name}"]`);
+            
+            if (isSorting) {
+                stopRequested = true;
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            stopRequested = false;
+            paused = false;
+            isSorting = true;
+            comparisons = 0; 
+            updateStatus(`Sorting: ${sortName}`);
+            pauseIcon.innerHTML = pauseIconSVG; 
+            currentAlgorithmDisplayName = sortName;
+            setActiveAlgoButton(clickedButton); 
+
+            let isNonComparative = false;
+            switch (sortName) {
+                case "Bubble Sort": updateTimeComplexity("O(n^2)"); break;
+                case "Selection Sort": updateTimeComplexity("O(n^2)"); break;
+                case "Insertion Sort": updateTimeComplexity("O(n^2)"); break;
+                case "Binary Sort": updateTimeComplexity("O(n^2)"); break;
+                case "Merge Sort": updateTimeComplexity("O(n log n)"); break;
+                case "Quick Sort": updateTimeComplexity("O(n log n) (avg)"); break;
+                case "Radix Sort": updateTimeComplexity("O(nk)"); isNonComparative = true; break;
+                case "Bucket Sort": updateTimeComplexity("O(n+k) (avg)"); isNonComparative = true; break;
+                case "Counting Sort": updateTimeComplexity("O(n+k)"); isNonComparative = true; break;
+                default: updateTimeComplexity("N/A"); break;
+            }
+            updateComparisons(comparisons, isNonComparative);
+            disableButtons();
+
+            try {
+                await sortMethod();
+            } catch (error) {
+                console.error("Sorting error:", error);
+            } finally {
+                highlightA = -1;
+                highlightB = -1;
+                drawArray(); 
+                isSorting = false;
+                currentStatus = stopRequested ? "Stopped" : "Done";
+                updateStatus(currentStatus);
+                updateComparisons(comparisons, isNonComparative);
+                enableButtons();
+                if (currentStatus === "Done") {
+                    setActiveAlgoButton(clickedButton);
+                } else {
+                    setActiveAlgoButton(null); 
+                }
+            }
+        }
+
+        async function bubbleSort() {
+            for (let i = 0; i < array.length - 1 && !stopRequested; i++) {
+                for (let j = 0; j < array.length - i - 1 && !stopRequested; j++) {
+                    comparisons++;
+                    highlightA = j;
+                    highlightB = j + 1;
+                    drawArray(); 
+                    await delay();
+                    if (array[j] > array[j + 1]) {
+                        await swap(j, j + 1);
+                    }
+                }
+            }
+        }
+
+        async function selection_sort() {
+            const n = array.length;
+            for (let i = 0; i < n - 1 && !stopRequested; i++) {
+                let min_idx = i;
+                for (let j = i + 1; j < n && !stopRequested; j++) {
+                    comparisons++;
+                    highlightA = min_idx; 
+                    highlightB = j;      
+                    drawArray();
+                    await delay();
+
+                    if (array[j] < array[min_idx]) {
+                        min_idx = j;
+                    }
+                    updateComparisons(comparisons, false);
+                }
+                if (min_idx !== i) {
+                    await swap(i, min_idx);
+                }
+            }
+        }
+
+        async function insertionSort() {
+            for (let i = 1; i < array.length && !stopRequested; i++) {
+                let key = array[i];
+                let j = i - 1;
+
+                highlightB = i; 
+                drawArray();
+                await delay();
+
+                while (j >= 0 && !stopRequested) {
+                    comparisons++;
+                    if (array[j] > key) {
+                        array[j + 1] = array[j];
+                        highlightA = j;
+                        highlightB = j + 1;
+                        drawArray();
+                        await delay();
+                        j--;
+                    } else {
+                        break;
+                    }
+                    updateComparisons(comparisons, false);
+                }
+                array[j + 1] = key;
+                highlightA = j + 1;
+                highlightB = -1;
+                drawArray();
+                await delay();
+            }
+        }
+
+        async function binarySearchInsertionPoint(arr, low, high, key) {
+            while (low <= high) {
+                if (stopRequested) return low; 
+                let mid = Math.floor(low + (high - low) / 2);
+
+                highlightA = mid;
+                highlightB = -1;
+                drawArray();
+                await delay();
+
+                comparisons++;
+                updateComparisons(comparisons, false);
+
+                if (arr[mid] > key) {
+                    high = mid - 1;
+                } else {
+                    low = mid + 1;
+                }
+            }
+            return low;
+        }
+
+        async function binarySort() {
+            for (let i = 1; i < array.length && !stopRequested; i++) {
+                let key = array[i];
+                highlightB = i; 
+                drawArray();
+                await delay();
+
+                let insertedIndex = await binarySearchInsertionPoint(array, 0, i - 1, key);
+
+                for (let j = i - 1; j >= insertedIndex && !stopRequested; j--) {
+                    array[j + 1] = array[j];
+                    highlightA = j;
+                    highlightB = j + 1;
+                    drawArray();
+                    await delay();
+                }
+                array[insertedIndex] = key;
+                highlightA = insertedIndex;
+                highlightB = -1;
+                drawArray();
+                await delay();
+            }
+        }
+
+        async function mergeSortRecursive(arr, left, right) {
+            if (left >= right || stopRequested) return;
+            let mid = Math.floor(left + (right - left) / 2);
+            await mergeSortRecursive(arr, left, mid);
+            await mergeSortRecursive(arr, mid + 1, right);
+            await merge(arr, left, mid, right);
+            drawArray();
+            await delay();
+        }
+
+        async function merge(arr, left, mid, right) {
+            let temp = [];
+            let i = left, j = mid + 1, k = 0;
+
+            while (i <= mid && j <= right && !stopRequested) {
+                highlightA = i;
+                highlightB = j;
+                drawArray();
+                await delay();
+
+                comparisons++;
+                updateComparisons(comparisons, false);
+                if (arr[i] < arr[j]) {
+                    temp.push(arr[i++]);
+                } else {
+                    temp.push(arr[j++]);
+                }
+            }
+            while (i <= mid && !stopRequested) {
+                highlightA = i;
+                highlightB = -1;
+                drawArray();
+                await delay();
+                temp.push(arr[i++]);
+            }
+            while (j <= right && !stopRequested) {
+                highlightA = j;
+                highlightB = -1;
+                drawArray();
+                await delay();
+                temp.push(arr[j++]);
+            }
+
+            for (k = 0; k < temp.length && !stopRequested; k++) {
+                arr[left + k] = temp[k];
+                highlightA = left + k;
+                highlightB = -1;
+                drawArray();
+                await delay();
+            }
+        }
+
+        async function quickSortRecursive(arr, low, high) {
+            if (low < high && !stopRequested) {
+                let pi = await partition(arr, low, high);
+                highlightA = pi;
+                highlightB = -1;
+                drawArray();
+                await delay();
+                await quickSortRecursive(arr, low, pi - 1);
+                await quickSortRecursive(arr, pi + 1, high);
+            }
+        }
+
+        async function partition(arr, low, high) {
+            let pivot = arr[high];
+            highlightB = high; 
+            let i = low - 1;
+
+            for (let j = low; j < high && !stopRequested; j++) {
+                comparisons++;
+                updateComparisons(comparisons, false);
+                if (arr[j] < pivot) {
+                    i++;
+                    await swap(i, j);
+                }
+                highlightA = j;
+                drawArray();
+                await delay();
+            }
+            await swap(i + 1, high);
+            return i + 1;
+        }
+
+        async function radixSort() {
+            let max = 0;
+            for (let i = 0; i < array.length; i++) {
+                if (array[i] > max) max = array[i];
+            }
+
+            for (let exp = 1; Math.floor(max / exp) > 0 && !stopRequested; exp *= 10) {
+                await countSortForRadix(exp);
+                drawArray();
+                await delay();
+            }
+        }
+
+        async function countSortForRadix(exp) {
+            let output = new Array(array.length);
+            let count = new Array(10).fill(0);
+
+            for (let i = 0; i < array.length; i++) {
+                if (stopRequested) return;
+                count[Math.floor((array[i] / exp) % 10)]++;
+                highlightA = i; 
+                highlightB = -1;
+                drawArray();
+                await delay();
+            }
+
+            for (let i = 1; i < 10; i++) {
+                count[i] += count[i - 1];
+            }
+
+            for (let i = array.length - 1; i >= 0; i--) {
+                if (stopRequested) return;
+                let digit = Math.floor((array[i] / exp) % 10);
+                output[count[digit] - 1] = array[i];
+
+                highlightA = i; 
+                highlightB = count[digit] - 1; 
+                drawArray();
+                await delay();
+
+                count[digit]--;
+            }
+
+            for (let i = 0; i < array.length; i++) {
+                if (stopRequested) return;
+                array[i] = output[i];
+                highlightA = i; 
+                highlightB = -1;
+                drawArray();
+                await delay();
+            }
+        }
+
+        async function bucketSort() {
+            let maxVal = 0;
+            for (let i = 0; i < array.length; i++) {
+                if (array[i] > maxVal) maxVal = array[i];
+            }
+
+            const bucketCount = 10;
+            let buckets = [];
+            for (let i = 0; i < bucketCount; i++) {
+                buckets.push([]);
+            }
+
+            for (let i = 0; i < array.length && !stopRequested; i++) {
+                const num = array[i];
+                const idx = Math.floor(((num - MIN_VALUE) * bucketCount) / (MAX_VALUE - MIN_VALUE + 1));
+                buckets[idx].push(num);
+
+                highlightA = i;
+                highlightB = -1;
+                drawArray();
+                await delay();
+            }
+
+            let index = 0;
+            for (let i = 0; i < bucketCount && !stopRequested; i++) {
+                const bucket = buckets[i];
+                bucket.sort((a, b) => a - b);
+
+                for (let j = 0; j < bucket.length && !stopRequested; j++) {
+                    array[index++] = bucket[j];
+                    highlightA = index - 1; 
+                    highlightB = -1;
+                    drawArray();
+                    await delay();
+                }
+            }
+        }
+
+        async function countingSort() {
+            let min = MIN_VALUE;
+            let max = MAX_VALUE;
+            const range = max - min + 1;
+
+            let count = new Array(range).fill(0);
+            let output = new Array(array.length);
+
+            for (let i = 0; i < array.length && !stopRequested; i++) {
+                count[array[i] - min]++;
+                highlightA = i; 
+                highlightB = -1;
+                drawArray();
+                await delay();
+            }
+
+            for (let i = 1; i < count.length && !stopRequested; i++) {
+                count[i] += count[i - 1];
+            }
+
+            for (let i = array.length - 1; i >= 0 && !stopRequested; i--) {
+                let value = array[i];
+                let outputIndex = count[value - min] - 1;
+                output[outputIndex] = value;
+
+                highlightA = i; 
+                highlightB = outputIndex; 
+                drawArray();
+                await delay();
+
+                count[value - min]--;
+            }
+
+            for (let i = 0; i < array.length && !stopRequested; i++) {
+                array[i] = output[i];
+                highlightA = i; 
+                highlightB = -1;
+                drawArray();
+                await delay();
+            }
+        }
+
+
+        // --- Event Listeners and Initialization ---
+
+        const sortAlgorithms = [
+            { name: "Bubble", method: bubbleSort, display: "Bubble Sort" },
+            { name: "Selection", method: selection_sort, display: "Selection Sort" },
+            { name: "Insertion", method: insertionSort, display: "Insertion Sort" },
+            { name: "BinaryInsertion", method: binarySort, display: "Binary Sort" },
+            { name: "Merge", method: () => mergeSortRecursive(array, 0, array.length - 1), display: "Merge Sort" },
+            { name: "Quick", method: () => quickSortRecursive(array, 0, array.length - 1), display: "Quick Sort" },
+            { name: "Radix", method: radixSort, display: "Radix Sort" },
+            { name: "Bucket", method: bucketSort, display: "Bucket Sort" },
+            { name: "Counting", method: countingSort, display: "Counting Sort" },
+        ];
+
+        function setupEventListeners() {
+            
+            // Populate the sidebar with algorithm buttons
+            sortAlgorithms.forEach(algo => {
+                const btn = document.createElement('button');
+                btn.textContent = algo.display;
+                btn.classList.add('algo-sidebar-btn');
+                btn.dataset.algo = algo.name; // Use dataset for tracking
+                btn.addEventListener('click', () => {
+                    // Reset if a different algorithm is selected
+                    if (selectedAlgorithm && selectedAlgorithm.name !== algo.name) {
+                        resetVisualizer();
+                    }
+                    selectedAlgorithm = algo;
+                    currentAlgorithmDisplayName = algo.display;
+                    // Update complexity info immediately
+                    let complexity = "N/A";
+                    switch (algo.display) {
+                        case "Bubble Sort": complexity = "O(n^2)"; break;
+                        case "Selection Sort": complexity = "O(n^2)"; break;
+                        case "Insertion Sort": complexity = "O(n^2)"; break;
+                        case "Binary Sort": complexity = "O(n^2)"; break;
+                        case "Merge Sort": complexity = "O(n log n)"; break;
+                        case "Quick Sort": complexity = "O(n log n) (avg)"; break;
+                        case "Radix Sort": complexity = "O(nk)"; break;
+                        case "Bucket Sort": complexity = "O(n+k) (avg)"; break;
+                        case "Counting Sort": complexity = "O(n+k)"; break;
+                    }
+                    updateTimeComplexity(complexity);
+                    setActiveAlgoButton(btn);
+                    updateStatus("Ready to Sort");
+                });
+                sortAlgorithmButtonsContainer.appendChild(btn);
+            });
+
+            // Start Button (Trigger the currently selected sort)
+            startButton.addEventListener('click', () => {
+                if (!selectedAlgorithm) {
+                    alert("Please select a sorting algorithm first!");
+                    return;
+                }
+                if (!isSorting) {
+                    // Reset to ensure a fresh, shuffled start before sorting
+                    resetVisualizer(); 
+                    setTimeout(() => startSorting(selectedAlgorithm.display, selectedAlgorithm.method), 50);
+                }
+            });
+
+            // Speed Button
+            speedButton.addEventListener('click', () => {
+                fastMode = !fastMode;
+                speedButton.textContent = `${fastMode ? 'Fast' : 'Slow'}`;
+            });
+
+            // Pause/Resume Button
+            pauseButton.addEventListener('click', () => {
+                paused = !paused;
+                pauseIcon.innerHTML = paused ? playIconSVG : pauseIconSVG;
+                updateStatus(paused ? 'Paused' : (isSorting ? `Sorting: ${currentAlgorithmDisplayName}` : 'Idle'));
+            });
+
+            // Reset Button
+            resetButton.addEventListener('click', () => {
+                resetVisualizer();
+                selectedAlgorithm = null; // Clear selection on full reset
+                currentAlgorithmDisplayName = "N/A";
+                setActiveAlgoButton(null);
+            });
+
+            // --- LLM Integration: Explain Algorithm ---
+            explainAlgoButton.addEventListener('click', async () => {
+                const algoToExplain = currentAlgorithmDisplayName;
+                if (algoToExplain === "N/A" || !selectedAlgorithm) {
+                    modalContent.innerHTML = '<p class="text-yellow-400">Please select an algorithm to get an explanation.</p>';
+                    explanationModal.classList.remove('hidden');
+                    return;
+                }
+
+                modalContent.innerHTML = '<p class="text-center text-xl text-blue-300">Loading explanation... <span class="animate-spin inline-block ml-2 text-2xl">&#9696;</span></p>';
+                explanationModal.classList.remove('hidden');
+
+                try {
+                    // MOCK LLM response due to API key restrictions in this environment
+                    const promptAlgoName = algoToExplain === "Binary Sort" ? "Binary Insertion Sort" : algoToExplain;
+                    let mockExplanation;
+
+                    switch (algoToExplain) {
+                        case "Bubble Sort":
+                            mockExplanation = `### Bubble Sort
+**Working Principle:** Compares adjacent elements and swaps them if they are in the wrong order, repeatedly passing through the list until no swaps are needed. The largest element 'bubbles up' to its correct position in each pass.
+**Time Complexity:**
+* **Best:** O(n) (Already sorted)
+* **Average & Worst:** O(n²)
+**Ideal Use Cases:** Educational tool; very small, nearly sorted lists.`;
+                            break;
+                        case "Merge Sort":
+                            mockExplanation = `### Merge Sort
+**Working Principle:** A divide-and-conquer algorithm. It divides the array into two halves, recursively sorts them, and then merges the two sorted halves back into a single array. It is a stable sort.
+**Time Complexity:**
+* **Best, Average & Worst:** O(n log n)
+**Ideal Use Cases:** Parallel processing, sorting large data sets, and sorting linked lists.`;
+                            break;
+                        case "Quick Sort":
+                             mockExplanation = `### Quick Sort
+**Working Principle:** A divide-and-conquer algorithm that selects a 'pivot' element and partitions the other elements into two sub-arrays according to whether they are less than or greater than the pivot. The sub-arrays are then sorted recursively.
+**Time Complexity:**
+* **Best & Average:** O(n log n)
+* **Worst:** O(n²) (Poor pivot choice)
+**Ideal Use Cases:** In-place sorting of arrays; generally considered one of the fastest general-purpose algorithms in practice.`;
+                            break;
+                        case "Radix Sort":
+                            mockExplanation = `### Radix Sort
+**Working Principle:** A non-comparative integer sorting algorithm that sorts data by processing individual digits (or components). It repeatedly sorts the list by least significant digit to most significant digit using a stable subroutine like Counting Sort.
+**Time Complexity:**
+* **Best, Average & Worst:** O(nk), where $n$ is the number of elements and $k$ is the number of digits in the largest number.
+**Ideal Use Cases:** Sorting large lists of fixed-length integers, especially when $k$ is small.`;
+                            break;
+                        default:
+                            mockExplanation = `### ${algoToExplain}
+A detailed explanation for **${promptAlgoName}** would be provided by the Gemini API here.
+**Complexity:** ${document.getElementById('timeComplexityLabel').textContent}
+This algorithm is typically characterized by its ${algoToExplain.includes('Insertion') ? 'simple in-place insertion logic.' : 'unique approach.'}`;
+                            break;
+                    }
+                    
+                    await new Promise(r => setTimeout(r, 1000)); 
+                    modalContent.innerHTML = mockExplanation.replace(/\n/g, '<br>');
+
+                } catch (error) {
+                    modalContent.innerHTML = `<p class="text-red-400">Error: ${error.message}. Failed to fetch explanation.</p>`;
+                    console.error("Error fetching explanation from Gemini API:", error);
+                }
+            });
+
+            closeModalButton.addEventListener('click', () => {
+                explanationModal.classList.add('hidden');
+            });
+
+            explanationModal.addEventListener('click', (event) => {
+                if (event.target === explanationModal) {
+                    explanationModal.classList.add('hidden');
+                }
+            });
+        }
+
+        // --- Initial Setup ---
+        window.addEventListener('load', () => {
+            setCanvasDimensions();
+            generateRandomArray();
+            drawArray();
+            setupEventListeners();
+            startButton.disabled = true; // Disable until an algorithm is selected
+
+            window.addEventListener('resize', () => {
+                setCanvasDimensions();
+                drawArray(); 
+            });
+        });
+
+    </script>
+</body>
+</html>
